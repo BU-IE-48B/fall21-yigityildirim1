@@ -1,4 +1,4 @@
-### Progress Journal of Omer Yildirim 
+# Progress Journal of Omer Yildirim 
 
 ## Homework 0
 
