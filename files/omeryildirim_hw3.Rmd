@@ -1,0 +1,588 @@
+---
+title: "hw3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## HW3
+
+In this homework we had to choose 5 different time series and predict the classes of the test data, testing 2 different representations and cross validating and finding the best k value. The first data set I have tried was EthanolLevel data set. This data set has 504 time series for train and 500 for test data. However, my computer refused to process the data this big and unfortunately, I was persistent and tried to reshape the data as my computer can process it. In this process I have spent so much time that I was only able to work with 1 data set. Here you can see the data manipulation I have done, reducing the time series in both train and test data.
+
+```{r}
+require(repr)
+require(rpart)
+require(rattle)
+require(TSrepr)
+library(data.table,quietly = TRUE)
+library(ggplot2,quietly = TRUE)
+library(lubridate,quietly = TRUE)
+library(zoo,quietly = TRUE)
+require(ggplot2)
+
+
+
+# options(repr.plot.width=15, repr.plot.height=8)
+
+current_folder=getwd()
+dataset='EthanolLevel'
+
+train_data_path_ethanol=sprintf('%s/ClassificationData/%s/%s_TRAIN.txt',current_folder,dataset,dataset)
+train_data_ethanol=fread(train_data_path_ethanol)
+
+test_data_path_ethanol=sprintf('%s/ClassificationData/%s/%s_TEST.txt',current_folder,dataset,dataset)
+test_data_ethanol=fread(test_data_path_ethanol)
+
+
+setnames(train_data_ethanol,'V1','class')
+train_data_ethanol=train_data_ethanol[order(class)]
+train_data_ethanol[,class:=as.character(class)]
+train_data_ethanol[,id:=1:.N]
+long_train_ethanol=melt(train_data_ethanol,id.vars=c('id','class'))
+long_train_ethanol[,time:=as.numeric(gsub("\\D", "", variable))-1]
+long_train_ethanol=long_train_ethanol[,list(id,class,time,value)]
+long_train_ethanol=long_train_ethanol[order(id,time)]
+
+
+setnames(test_data_ethanol,'V1','class')
+test_data_ethanol=test_data_ethanol[order(class)]
+test_data_ethanol[,class:=as.character(class)]
+test_data_ethanol[,id:=1:.N]
+long_test_ethanol=melt(test_data_ethanol,id.vars=c('id','class'))
+long_test_ethanol[,time:=as.numeric(gsub("\\D", "", variable))-1]
+long_test_ethanol=long_test_ethanol[,list(id,class,time,value)]
+long_test_ethanol=long_test_ethanol[order(id,time)]
+head(long_test_ethanol)
+
+split_list <- split(long_train_ethanol,long_train_ethanol$class)
+
+
+class_1= as.data.table(split_list[1])
+class_2= as.data.table(split_list[2])
+class_3= as.data.table(split_list[3])
+class_4= as.data.table(split_list[4])
+
+
+class_1[,rN:=X1.id]
+class_2[,rN:=X2.id-126]
+class_3[,rN:=X3.id-252]
+class_4[,rN:=X4.id-378]
+
+class_1 = class_1[rN<=25]
+class_2 = class_2[rN<=25]
+class_3 = class_3[rN<=25]
+class_4 = class_4[rN<=25]
+
+setnames(class_1,'X1.id','id')
+setnames(class_2,'X2.id','id')
+setnames(class_3,'X3.id','id')
+setnames(class_4,'X4.id','id')
+
+
+setnames(class_1,'X1.class','class')
+setnames(class_2,'X2.class','class')
+setnames(class_3,'X3.class','class')
+setnames(class_4,'X4.class','class')
+
+setnames(class_1,'X1.time','time')
+setnames(class_2,'X2.time','time')
+setnames(class_3,'X3.time','time')
+setnames(class_4,'X4.time','time')
+
+setnames(class_1,'X1.value','value')
+setnames(class_2,'X2.value','value')
+setnames(class_3,'X3.value','value')
+setnames(class_4,'X4.value','value')
+
+
+class_1=class_1[,list(id,class,time,value)]
+class_2=class_2[,list(id,class,time,value)]
+class_3=class_3[,list(id,class,time,value)]
+class_4=class_4[,list(id,class,time,value)]
+
+
+
+long_train = rbind(class_1, class_2, class_3,class_4)
+
+
+
+#######################
+split_list <- split(long_test_ethanol,long_test_ethanol$class)
+
+
+class_t_1= as.data.table(split_list[1])
+class_t_2= as.data.table(split_list[2])
+class_t_3= as.data.table(split_list[3])
+class_t_4= as.data.table(split_list[4])
+
+
+class_t_1[,rN:=X1.id]
+class_t_2[,rN:=X2.id-126]
+class_t_3[,rN:=X3.id-250]
+class_t_4[,rN:=X4.id-376]
+
+class_t_1 = class_t_1[rN<=5]
+class_t_2 = class_t_2[rN<=5]
+class_t_3 = class_t_3[rN<=5]
+class_t_4 = class_t_4[rN<=5]
+
+setnames(class_t_1,'X1.id','id')
+setnames(class_t_2,'X2.id','id')
+setnames(class_t_3,'X3.id','id')
+setnames(class_t_4,'X4.id','id')
+
+
+
+
+setnames(class_t_1,'X1.class','class')
+setnames(class_t_2,'X2.class','class')
+setnames(class_t_3,'X3.class','class')
+setnames(class_t_4,'X4.class','class')
+
+setnames(class_t_1,'X1.time','time')
+setnames(class_t_2,'X2.time','time')
+setnames(class_t_3,'X3.time','time')
+setnames(class_t_4,'X4.time','time')
+
+setnames(class_t_1,'X1.value','value')
+setnames(class_t_2,'X2.value','value')
+setnames(class_t_3,'X3.value','value')
+setnames(class_t_4,'X4.value','value')
+
+
+class_t_1=class_t_1[,list(id,class,time,value)]
+class_t_2=class_t_2[,list(id,class,time,value)]
+class_t_3=class_t_3[,list(id,class,time,value)]
+class_t_4=class_t_4[,list(id,class,time,value)]
+
+
+
+long_test = rbind(class_t_1, class_t_2, class_t_3,class_t_4)
+
+
+```
+
+## Plots
+
+I have plotted the data to see if there are any significant visual differences but there were none. 
+
+```{r, echo=FALSE}
+ggplot(long_train, aes(time,value)) + geom_line(aes(color=as.character(id))) +  
+  facet_wrap(~class)
+
+```
+
+Here I have tried 2 different representations to see which is better.
+
+```{r}
+# SAX approximation
+selected_series=128
+data_ts=long_train[id==selected_series]$value
+sax_segment_length=30
+sax_alphabet_size=7
+sax_rep=repr_sax(data_ts, q = sax_segment_length, a = sax_alphabet_size)
+
+
+
+
+
+# PAA approximation
+segment_length=100
+data_ts=long_train[id==selected_series]$value
+paa_rep=repr_paa(data_ts, segment_length, meanC)
+plot(paa_rep,type='l')
+
+
+
+data_plot=long_train[id==selected_series]
+##########
+
+dummy_time=c(1:(length(sax_rep)-1))*sax_segment_length
+dummy_time=c(dummy_time,length(data_ts))
+dt_sax=data.table(time=dummy_time,sax_rep_char=sax_rep)
+
+
+dummy_time=c(1:(length(paa_rep)-1))*segment_length
+dummy_time=c(dummy_time,nrow(data_plot))
+dt_paa=data.table(time=dummy_time,paa_rep=paa_rep)
+
+#plotting the data and checking sse
+
+data_plot=merge(data_plot,dt_paa,by='time',all.x=T)
+data_plot[,paa_rep:=nafill(paa_rep,"nocb")]
+data_plot=merge(data_plot,dt_sax,by='time',all.x=T)
+
+data_plot[,sax_rep_char_num:=nafill(as.numeric(as.factor(sax_rep_char)),'nocb')] # from data.table
+data_plot[,sax_rep:=mean(value),by=list(sax_rep_char_num)]
+
+data_plot=melt(data_plot,id.vars='time',
+               measure.vars=c('value', 'paa_rep','sax_rep'))
+
+ggplot(data_plot,aes(x=time,y=value,color=variable))+
+  geom_line()
+
+
+data_plot=merge(data_plot,long_train[id==selected_series,list(time,obs=value)],by='time')
+
+data_plot[,list(sse=sum((value-obs)^2)),list(variable)]
+
+data_plot
+```
+
+Comparing the SSE SAX representation was better so I have applied this representation for both train and test data.
+
+
+```{r}
+#we choose sax
+
+sax_list = list()
+
+
+for(val in unique(long_train$id)){
+  segment_length=30
+  data_ts=long_train[id==val]$value
+  sax_rep=repr_sax(data_ts, q = sax_segment_length, a = sax_alphabet_size)
+  sax_list = append(sax_list, sax_rep)
+
+}
+sax_vector = unlist(sax_list)
+
+
+
+data_plot2= long_train
+dummy_time=c(1:(length(sax_vector)-1))*segment_length
+dummy_time=c(dummy_time,nrow(long_train))
+
+dt_sax=data.table(dtime=dummy_time,sax_vector_char=sax_vector)
+
+
+
+
+data_plot2[,dtime:=1:.N]
+data_plot2=merge(data_plot2,dt_sax,by='dtime',all.x=T)
+
+
+
+data_plot2[,sax_rep_char_num:=nafill(as.numeric(as.factor(sax_vector_char)),'nocb')] # from data.table
+data_plot2[,sax_rep:=mean(value),by=list(sax_rep_char_num)]
+
+
+
+sax_aprox = data_plot2$sax_rep
+
+
+x <- c(unique(long_train$id))
+
+time_serie_length=1751
+Train_ts_number=100
+
+sax_matrix =matrix(sax_aprox,nrow = Train_ts_number,ncol = time_serie_length, byrow=TRUE)
+sax_matrix
+colnames(sax_matrix) <- c(1:1751)
+rownames(sax_matrix) <- c(1:100)
+
+
+
+
+
+
+#same thing for the test data
+
+sax_list = list()
+
+
+for(val in unique(long_test$id)){
+  segment_length=30
+  data_ts=long_test[id==val]$value
+  sax_rep=repr_sax(data_ts, q = sax_segment_length, a = sax_alphabet_size)
+  sax_list = append(sax_list, sax_rep)
+  
+}
+sax_vector = unlist(sax_list)
+
+
+
+data_plot3= long_test
+dummy_time=c(1:(length(sax_vector)-1))*segment_length
+dummy_time=c(dummy_time,nrow(long_test))
+
+dt_sax=data.table(dtime=dummy_time,sax_vector=sax_vector)
+
+data_plot3[,dtime:=1:.N]
+
+
+data_plot3=merge(data_plot3,dt_sax,by='dtime',all.x=T)
+
+
+data_plot3[,sax_rep_char_num_t:=nafill(as.numeric(as.factor(sax_vector)),'nocb')] # from data.table
+data_plot3[,sax_rep_t:=mean(value),by=list(sax_rep_char_num_t)]
+
+
+
+sax_aprox = data_plot3$sax_rep_t 
+
+
+x <- c(unique(long_test$id))
+
+time_serie_length=1751
+test_ts_number=20
+
+sax_matrix_t =matrix(sax_aprox,nrow = test_ts_number,ncol = time_serie_length, byrow=TRUE)
+sax_matrix_t
+colnames(sax_matrix_t) <- c(1:1751)
+rownames(sax_matrix_t) <- c(101:120)
+
+
+
+#######################
+```
+
+Some additional data manipulation was needed because I have shortened the data in order to enable it for processing for my computer. Id information was a bit mixed.
+
+
+
+
+```{r}
+split_list <- split(long_test,long_test$class)
+
+
+class_t_1= as.data.table(split_list[1])
+class_t_2= as.data.table(split_list[2])
+class_t_3= as.data.table(split_list[3])
+class_t_4= as.data.table(split_list[4])
+
+
+setnames(class_t_1,'X1.id','id')
+setnames(class_t_2,'X2.id','id')
+setnames(class_t_3,'X3.id','id')
+setnames(class_t_4,'X4.id','id')
+
+
+class_t_1 = class_t_1[,id:=id+100]
+class_t_2 = class_t_2[,id:=id-21]
+class_t_3 = class_t_3[,id:=id-140]
+class_t_4 = class_t_4[,id:=id-261]
+
+
+setnames(class_t_1,'X1.class','class')
+setnames(class_t_2,'X2.class','class')
+setnames(class_t_3,'X3.class','class')
+setnames(class_t_4,'X4.class','class')
+
+setnames(class_t_1,'X1.time','time')
+setnames(class_t_2,'X2.time','time')
+setnames(class_t_3,'X3.time','time')
+setnames(class_t_4,'X4.time','time')
+
+setnames(class_t_1,'X1.value','value')
+setnames(class_t_2,'X2.value','value')
+setnames(class_t_3,'X3.value','value')
+setnames(class_t_4,'X4.value','value')
+
+
+class_t_1=class_t_1[,list(id,class,time,value)]
+class_t_2=class_t_2[,list(id,class,time,value)]
+class_t_3=class_t_3[,list(id,class,time,value)]
+class_t_4=class_t_4[,list(id,class,time,value)]
+
+
+
+long_test = rbind(class_t_1, class_t_2, class_t_3,class_t_4)
+
+
+
+##############
+split_list <- split(long_train,long_train$class)
+
+
+class_1= as.data.table(split_list[1])
+class_2= as.data.table(split_list[2])
+class_3= as.data.table(split_list[3])
+class_4= as.data.table(split_list[4])
+
+
+
+
+setnames(class_1,'X1.id','id')
+setnames(class_2,'X2.id','id')
+setnames(class_3,'X3.id','id')
+setnames(class_4,'X4.id','id')
+
+
+class_2 = class_2[,id:=id-101]
+class_3 = class_3[,id:=id-202]
+class_4 = class_4[,id:=id-303]
+
+setnames(class_1,'X1.class','class')
+setnames(class_2,'X2.class','class')
+setnames(class_3,'X3.class','class')
+setnames(class_4,'X4.class','class')
+
+setnames(class_1,'X1.time','time')
+setnames(class_2,'X2.time','time')
+setnames(class_3,'X3.time','time')
+setnames(class_4,'X4.time','time')
+
+setnames(class_1,'X1.value','value')
+setnames(class_2,'X2.value','value')
+setnames(class_3,'X3.value','value')
+setnames(class_4,'X4.value','value')
+
+
+class_1=class_1[,list(id,class,time,value)]
+class_2=class_2[,list(id,class,time,value)]
+class_3=class_3[,list(id,class,time,value)]
+class_4=class_4[,list(id,class,time,value)]
+
+
+
+long_train = rbind(class_1, class_2, class_3,class_4)
+
+
+```
+
+Then I have created a distance model and applied cross validation to see which k value is better.
+
+
+
+```{r}
+###Distance model
+class_matrix = rbind(sax_matrix, sax_matrix_t)
+
+distance=as.matrix(dist(class_matrix))
+dist_mat = distance
+
+
+train_indices= unique(long_train$id)
+test_indices = unique(long_test$id)
+
+
+test_distances_to_train=dist_mat[test_indices,]
+test_distances_to_train=test_distances_to_train[,-test_indices]
+train_class <- c(rep(1, times=25), rep(2, times=25),rep(3, times=25),rep(4, times=25))
+
+ordered_indices=apply(test_distances_to_train,1,order)
+
+x = unique(long_train$id)
+
+# cv indices start here
+
+
+
+require(TunePareto)
+
+set.seed(13429)
+nof_rep=5
+n_fold=10
+cv_indices=generateCVRuns( train_class, ntimes =nof_rep, nfold = n_fold, 
+                          leaveOneOut = FALSE, stratified = TRUE)
+
+
+#####################
+
+nn_classify_cv=function(dist_matrix,train_class,test_indices,k=1){
+  
+  test_distances_to_train=dist_matrix[test_indices,]
+  test_distances_to_train=test_distances_to_train[,-test_indices]
+  trainclass=train_class[-test_indices]
+  #print(str(test_distances_to_train))
+  ordered_indices=apply(test_distances_to_train,1,order)
+  if(k==1){
+    nearest_class=as.numeric(trainclass[as.numeric(ordered_indices[1,])])
+    nearest_class=data.table(id=test_indices,nearest_class)
+  } else {
+    nearest_class=apply(ordered_indices[1:k,],2,function(x) {trainclass[x]})
+    nearest_class=data.table(id=test_indices,t(nearest_class))
+  }
+  
+  long_nn_class=melt(nearest_class,'id')
+  
+  class_counts=long_nn_class[,.N,list(id,value)]
+  class_counts[,predicted_prob:=N/k]
+  wide_class_prob_predictions=dcast(class_counts,id~value,value.var='predicted_prob')
+  wide_class_prob_predictions[is.na(wide_class_prob_predictions)]=0
+  class_predictions=class_counts[,list(predicted=value[which.max(N)]),by=list(id)]
+  
+  
+  return(list(prediction=class_predictions,prob_estimates=wide_class_prob_predictions))
+  
+}
+nn_classify=function(dist_matrix,train_class,test_indices,k=1){
+  
+  test_distances_to_train=dist_matrix[test_indices,]
+  test_distances_to_train=test_distances_to_train[,-test_indices]
+  trainclass=train_class
+  #print(str(test_distances_to_train))
+  ordered_indices=apply(test_distances_to_train,1,order)
+  if(k==1){
+    nearest_class=as.numeric(trainclass[as.numeric(ordered_indices[1,])])
+    nearest_class=data.table(id=test_indices,nearest_class)
+  } else {
+    nearest_class=apply(ordered_indices[1:k,],2,function(x) {trainclass[x]})
+    nearest_class=data.table(id=test_indices,t(nearest_class))
+  }
+  
+  long_nn_class=melt(nearest_class,'id')
+  
+  class_counts=long_nn_class[,.N,list(id,value)]
+  class_counts[,predicted_prob:=N/k]
+  wide_class_prob_predictions=dcast(class_counts,id~value,value.var='predicted_prob')
+  wide_class_prob_predictions[is.na(wide_class_prob_predictions)]=0
+  class_predictions=class_counts[,list(predicted=value[which.max(N)]),by=list(id)]
+  
+  
+  return(list(prediction=class_predictions,prob_estimates=wide_class_prob_predictions))
+  
+}
+
+k_levels=c(1,3,5)
+
+result=vector('list',nof_rep*n_fold*length(k_levels))
+iter=1
+
+  
+  
+  for(i in 1:nof_rep){
+    this_fold=cv_indices[[i]]
+    for(j in 1:n_fold){
+      test_indices=this_fold[[j]]
+      for(k in 1:length(k_levels)){
+        current_k=k_levels[k]
+        current_fold=nn_classify_cv(dist_mat,train_class,test_indices,k=current_k)
+        accuracy=sum(train_class[test_indices]==current_fold$prediction$predicted)/length(test_indices)
+        tmp=data.table(repid=i,foldid=j,
+                       k=current_k,acc=accuracy)
+        result[[iter]]=tmp
+        iter=iter+1
+        
+      
+      
+    }
+    
+  }   
+  
+}
+
+overall_results=rbindlist(result)
+overall_results[,list(avg_acc=mean(acc),sdev_acc=sd(acc),result_count=.N),by=list(k)]
+
+
+################
+```
+
+After obtaining the better value of k I have done an nn-classification with the value k to predict the classes. However, something went somehow wrong and the model was not accurate.
+
+
+```{r}
+test_class <- c(rep(1, times=5), rep(2, times=5),rep(3, times=5),rep(4, times=5))
+test_indices= unique(long_test$id)
+test_indices
+current_k=3
+current_fold=nn_classify(dist_mat,train_class,test_indices,k=current_k)
+accuracy=sum(test_class==current_fold$prediction$predicted)/length(test_indices)
+
+current_fold[[1]]
+accuracy
+```
