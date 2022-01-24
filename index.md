@@ -9,3 +9,7 @@
 ## Homework 3
 
 [Here](files/omeryildirim_hw3.Rmd)
+
+## Project
+
+[Here](files/ie48b_project.pdf)
